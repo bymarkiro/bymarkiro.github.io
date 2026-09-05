@@ -270,19 +270,20 @@ function generateVideo() {
 
     renderPreview('video', currentPrompt || 'Anuncio premium con estilo cinematográfico');
 
-    // --- Start: Simulated MP4 output so the Download button works locally ---
+    // Prefer GitHub-hosted MP4 file (put sample.mp4 in the repo root or change filename)
     try {
       // Revoke previous object URL if any
       if (lastGeneratedVideoUrl && lastGeneratedVideoUrl.startsWith('blob:')) {
         try { URL.revokeObjectURL(lastGeneratedVideoUrl); } catch (e) { /* ignore */ }
       }
 
-      lastGeneratedVideoName = (currentPrompt ? currentPrompt.slice(0,40).replace(/\s+/g,'_') : 'video') + '.mp4';
+      const githubFilename = 'sample.mp4';
+      const githubPagesUrl = `${window.location.origin}/${githubFilename}`;
+      const rawUrl = `https://raw.githubusercontent.com/bymarkiro/bymarkiro.github.io/main/${githubFilename}`;
 
-      // Create a small empty blob of type video/mp4 for simulation.
-      // In production replace this assignment with the real URL from your backend.
-      const dummyBlob = new Blob([''], { type: 'video/mp4' });
-      lastGeneratedVideoUrl = URL.createObjectURL(dummyBlob);
+      // If the site is served as username.github.io, prefer the Pages URL; otherwise use raw.githubusercontent
+      lastGeneratedVideoName = githubFilename;
+      lastGeneratedVideoUrl = (window.location.hostname.endsWith('github.io')) ? githubPagesUrl : rawUrl;
 
       const preview = document.getElementById('studioPreview');
       if (preview) {
@@ -291,15 +292,9 @@ function generateVideo() {
 
       const downloadBtn = document.getElementById('downloadBtn');
       if (downloadBtn) downloadBtn.disabled = false;
-
-      // Ensure the object URL is revoked when the page unloads
-      window.addEventListener('beforeunload', () => {
-        try { if (lastGeneratedVideoUrl && lastGeneratedVideoUrl.startsWith('blob:')) URL.revokeObjectURL(lastGeneratedVideoUrl); } catch (e) {}
-      });
     } catch (e) {
-      console.warn('No se pudo crear URL simulada para MP4', e);
+      console.warn('No se pudo asignar URL GitHub para MP4', e);
     }
-    // --- End: Simulated MP4 output ---
 
     if (statusPill) {
       statusPill.textContent = 'Video listo';
