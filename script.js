@@ -270,6 +270,37 @@ function generateVideo() {
 
     renderPreview('video', currentPrompt || 'Anuncio premium con estilo cinematográfico');
 
+    // --- Start: Simulated MP4 output so the Download button works locally ---
+    try {
+      // Revoke previous object URL if any
+      if (lastGeneratedVideoUrl && lastGeneratedVideoUrl.startsWith('blob:')) {
+        try { URL.revokeObjectURL(lastGeneratedVideoUrl); } catch (e) { /* ignore */ }
+      }
+
+      lastGeneratedVideoName = (currentPrompt ? currentPrompt.slice(0,40).replace(/\s+/g,'_') : 'video') + '.mp4';
+
+      // Create a small empty blob of type video/mp4 for simulation.
+      // In production replace this assignment with the real URL from your backend.
+      const dummyBlob = new Blob([''], { type: 'video/mp4' });
+      lastGeneratedVideoUrl = URL.createObjectURL(dummyBlob);
+
+      const preview = document.getElementById('studioPreview');
+      if (preview) {
+        preview.innerHTML = `<video id="generatedVideo" controls src="${lastGeneratedVideoUrl}" style="max-width:100%;border-radius:8px"></video>`;
+      }
+
+      const downloadBtn = document.getElementById('downloadBtn');
+      if (downloadBtn) downloadBtn.disabled = false;
+
+      // Ensure the object URL is revoked when the page unloads
+      window.addEventListener('beforeunload', () => {
+        try { if (lastGeneratedVideoUrl && lastGeneratedVideoUrl.startsWith('blob:')) URL.revokeObjectURL(lastGeneratedVideoUrl); } catch (e) {}
+      });
+    } catch (e) {
+      console.warn('No se pudo crear URL simulada para MP4', e);
+    }
+    // --- End: Simulated MP4 output ---
+
     if (statusPill) {
       statusPill.textContent = 'Video listo';
     }
