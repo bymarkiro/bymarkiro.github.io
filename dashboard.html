@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Panel de usuario MotionFlow AI" />
+  <title>MotionFlow AI | Panel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    body {
+      background:
+        radial-gradient(circle at top left, rgba(215,175,101,0.16), transparent 18%),
+        linear-gradient(180deg, #080c11 0%, #0d1722 100%);
+    }
+
+    .dashboard-shell {
+      width: min(1260px, calc(100% - 2rem));
+      margin: 2rem auto 4rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    .dashboard-layout {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      gap: 1.5rem;
+      align-items: start;
+    }
+
+    .sidebar,
+    .panel-card,
+    .workspace-card {
+      background: rgba(18, 24, 33, 0.82);
+      border: 1px solid rgba(222, 204, 176, 0.18);
+      border-radius: 24px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.28);
+    }
+
+    .sidebar { padding: 1.1rem; position: sticky; top: 5.5rem; }
+    .sidebar-brand { display:flex; align-items:center; gap:0.7rem; font-weight:800; margin-bottom:1.3rem; }
+    .sidebar-nav { display:grid; gap:0.6rem; }
+    .sidebar-link { display:flex; align-items:center; justify-content:space-between; padding:0.8rem 0.9rem; border-radius:12px; color:var(--muted); }
+
+    .workspace { display:grid; gap:1.2rem; }
+    .topbar { display:flex; align-items:center; justify-content:space-between; padding:1rem 1.2rem; background:rgba(14,19,27,0.7); border-radius:20px; }
+    .user-pill { display:inline-flex; align-items:center; gap:0.55rem; padding:0.55rem 0.8rem; border-radius:999px; background:rgba(255,255,255,0.04); }
+
+    .studio-grid { display:grid; grid-template-columns: 1fr 420px; gap:1.2rem; }
+    .panel-card { padding:1rem; }
+
+    .field-label { display:block; color:var(--muted); font-size:0.8rem; font-weight:700; margin-bottom:0.6rem; text-transform:uppercase; }
+    textarea, input, select { width:100%; background: rgba(8,12,17,0.72); border:1px solid rgba(214,204,176,0.18); border-radius:14px; color:var(--white); padding:0.9rem 1rem; }
+
+    .controls-grid { display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem; }
+    .button-row { display:flex; gap:0.75rem; flex-wrap:wrap; margin-top:0.6rem; }
+
+    .preview-panel .panel-card { min-height:420px; display:flex; flex-direction:column; gap:0.75rem; }
+    .preview-frame { flex:1; border-radius:12px; border:1px solid var(--line); background:linear-gradient(135deg, rgba(215,175,101,0.08), rgba(255,255,255,0.02)); display:flex; align-items:center; justify-content:center; }
+    .studio-preview { width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; color:var(--muted); }
+
+    .photo-stage { display:flex; align-items:center; gap:0.8rem; }
+    .photo-frame img { max-width:120px; max-height:88px; border-radius:10px; }
+
+    .status-row { display:flex; gap:0.6rem; align-items:center; justify-content:space-between; }
+    .status-pill { padding:0.45rem 0.7rem; border-radius:999px; background:rgba(255,255,255,0.03); border:1px solid rgba(215,175,101,0.12); }
+
+    @media (max-width: 920px) { .dashboard-layout, .studio-grid { grid-template-columns: 1fr; } .preview-panel { order: -1; } }
+  </style>
+</head>
+<body>
+  <div class="bg-orb orb-one"></div>
+  <div class="bg-orb orb-two"></div>
+
+  <div class="dashboard-shell">
+    <div class="dashboard-layout">
+      <aside class="sidebar">
+        <div class="sidebar-brand"><span class="brand-mark">M</span><span>MotionFlow</span></div>
+        <nav class="sidebar-nav">
+          <a class="sidebar-link active" href="#"><span>Panel</span><span class="sidebar-badge">Live</span></a>
+          <a class="sidebar-link" href="#"><span>Generador</span><span class="sidebar-badge">AI</span></a>
+          <a class="sidebar-link" href="#"><span>Fotos</span><span class="sidebar-badge">0</span></a>
+          <a class="sidebar-link" href="#"><span>Historial</span><span class="sidebar-badge">0</span></a>
+          <a class="sidebar-link" href="#"><span>Configuración</span><span class="sidebar-badge">+</span></a>
+        </nav>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div class="topbar-title">
+            <h1>Generador IA</h1>
+            <span>Crea videos e imágenes con IA desde aquí.</span>
+          </div>
+
+          <div class="topbar-actions">
+            <div class="user-pill">
+              <span class="user-dot"></span>
+              <span id="userNameLabel">Usuario</span>
+            </div>
+            <div class="status-pill" id="planTag">Plan: Gratis</div>
+            <button id="logoutBtn" class="btn btn-secondary" type="button">Cerrar sesión</button>
+          </div>
+        </header>
+
+        <section class="workspace-card">
+          <div class="studio-grid">
+            <div class="prompt-panel">
+              <div class="panel-card">
+                <label class="field-label" for="videoPrompt">Descripción / Prompt</label>
+                <textarea id="videoPrompt" placeholder="Describe lo que quieres generar (ej: anuncio cinematográfico, luz dorada, cámara lenta)..."></textarea>
+
+                <div style="margin-top:0.8rem" class="controls-grid">
+                  <div>
+                    <label class="field-label" for="modelSelect">Modelo</label>
+                    <select id="modelSelect">
+                      <option value="base">Base</option>
+                      <option value="cinematic">Cinematic</option>
+                      <option value="short_ad">Short Ad</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="field-label" for="styleSelect">Estilo</label>
+                    <select id="styleSelect">
+                      <option value="real">Realista</option>
+                      <option value="stylized">Estilizado</option>
+                      <option value="cartoon">Cartoon</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="field-label" for="videoDuration">Duración (s)</label>
+                    <input id="videoDuration" type="number" min="3" max="60" value="10" />
+                  </div>
+                  <div>
+                    <label class="field-label" for="aspectRatio">Aspecto</label>
+                    <select id="aspectRatio">
+                      <option value="16:9">16:9</option>
+                      <option value="9:16">9:16 (vertical)</option>
+                      <option value="1:1">1:1</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style="margin-top:0.8rem">
+                  <label class="field-label">Fuente</label>
+                  <div class="button-row">
+                    <button type="button" class="btn quick-create-btn" data-kind="video">Generar video</button>
+                    <button type="button" class="btn quick-create-btn" data-kind="image">Generar imagen</button>
+                    <label class="btn btn-secondary" style="display:inline-flex;align-items:center;gap:0.6rem;">
+                      <input id="photoInput" type="file" accept="image/*" style="display:none;" />
+                      Subir foto
+                    </label>
+                    <label style="display:inline-flex; align-items:center; gap:0.5rem; margin-left:0.6rem;">
+                      <input id="nsfwConsent" type="checkbox" />
+                      <span style="font-size:0.9rem;color:var(--muted);">Permito contenido NSFW (tengo +18 años)</span>
+                    </label>
+                    <button id="generateBtn" class="btn btn-primary">Crear con IA</button>
+                    <button id="upgradeBtn" class="btn btn-secondary">Activar Premium</button>
+                  </div>
+                </div>
+
+                <div style="margin-top:0.8rem" class="panel-card">
+                  <div class="photo-stage" id="photoStage"></div>
+                </div>
+
+                <div style="margin-top:0.6rem" class="status-row">
+                  <div id="statusPill" class="status-pill">Listo</div>
+                  <div>Uso hoy: <span id="usageCounter">0 / 1</span></div>
+                </div>
+              </div>
+            </div>
+
+            <aside class="preview-panel">
+              <div class="panel-card">
+                <div class="preview-frame">
+                  <div id="studioPreview" class="studio-preview">
+                    <strong>Vista previa</strong>
+                    <div style="margin-top:8px;color:var(--muted);">Aquí aparecerá una vista previa simulada del resultado</div>
+                  </div>
+                </div>
+
+                <div style="margin-top:0.6rem;display:flex;justify-content:space-between;align-items:center;">
+                  <div>
+                    <strong id="previewLabel">Sin generación</strong>
+                    <div style="color:var(--muted);font-size:0.85rem">Ajusta el prompt y pulsa Crear</div>
+                  </div>
+                  <div>
+                    <button id="downloadBtn" class="btn btn-secondary">Descargar</button>
+                  </div>
+                </div>
+              </div>
+            </aside>
+          </div>
+
+          <div style="margin-top:1rem" class="panel-card">
+            <h3>Presets rápidos</h3>
+            <div class="button-row">
+              <button class="btn quick-create-btn" data-kind="video">Anuncio 15s</button>
+              <button class="btn quick-create-btn" data-kind="image">Miniatura</button>
+              <button class="btn quick-create-btn" data-kind="photo-video">Foto → Video</button>
+            </div>
+            <p style="margin-top:0.8rem;color:var(--muted)">Nota: Actualmente la generación es simulada en el cliente. Para integración real necesitas un backend que llame a un modelo de IA.</p>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+  <script>
+    // Leer usuario desde localStorage o sessionStorage
+    const user = JSON.parse(localStorage.getItem('motionflow_user') || sessionStorage.getItem('motionflow_user') || 'null');
+    const userNameLabel = document.getElementById('userNameLabel');
+    if (userNameLabel) {
+      userNameLabel.textContent = user ? user.username : 'Invitado';
+    }
+
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', () => {
+        const keys = ['motionflow_user', 'motionflow_plan', 'motionflow_usage'];
+        keys.forEach(k => { try { localStorage.removeItem(k); } catch (e) {} try { sessionStorage.removeItem(k); } catch (e) {} });
+        // keep accounts if you want to preserve registered users
+        window.location.href = 'login.html';
+      });
+    }
+
+    // Hook: when clicking generateBtn, call existing generateVideo
+    const generateBtn = document.getElementById('generateBtn');
+    if (generateBtn) generateBtn.addEventListener('click', () => {
+      // Pass through to generateVideo which handles plan/usage
+      generateVideo();
+    });
+
+    // Download button: download preview as placeholder image
+    const downloadBtn = document.getElementById('downloadBtn');
+    if (downloadBtn) {
+      downloadBtn.addEventListener('click', () => {
+        const preview = document.getElementById('studioPreview');
+        if (!preview) return alert('No hay preview para descargar.');
+        alert('Descarga simulada: en producción descargarías el archivo generado desde el servidor.');
+      });
+    }
+
+    // Ensure UI reflects plan/usage
+    updateAuthUI();
+  </script>
+</body>
+</html>

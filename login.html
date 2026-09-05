@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Registro e inicio de sesión para MotionFlow AI" />
+  <title>MotionFlow AI | Acceder</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="auth-page">
+  <div class="bg-orb orb-one"></div>
+  <div class="bg-orb orb-two"></div>
+
+  <nav class="navbar auth-navbar">
+    <div class="container nav-inner">
+      <div class="brand">
+        <span class="brand-mark">M</span>
+        <span>MotionFlow AI</span>
+      </div>
+      <div class="nav-actions">
+        <a href="index.html" class="btn btn-secondary">Volver a inicio</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="auth-shell">
+    <div class="auth-layout">
+      <div class="auth-intro">
+        <span class="eyebrow">IA • imagen • video</span>
+        <h1>Empieza a crear contenido premium.</h1>
+        <p>Genera anuncios, reels y creatividades en segundos. Tu flujo de trabajo empieza aquí con un registro simple y rápido.</p>
+        <ul class="feature-list auth-feature-list">
+          <li>Generación instantánea</li>
+          <li>1 video diario gratis</li>
+          <li>Premium ilimitado</li>
+        </ul>
+      </div>
+
+      <section class="auth-card">
+        <div class="auth-switcher">
+          <button class="auth-tab active" data-auth-tab="login" type="button">Iniciar sesión</button>
+          <button class="auth-tab" data-auth-tab="register" type="button">Registrarse</button>
+        </div>
+
+        <div class="auth-panel active" id="loginPanel">
+          <h2>Bienvenido de nuevo</h2>
+          <p>Accede con tu correo y contraseña para seguir generando contenido.</p>
+
+          <form id="loginForm" class="auth-form">
+            <label for="loginEmail">Correo</label>
+            <input id="loginEmail" type="email" placeholder="Tu correo" required />
+
+            <label for="loginPassword">Contraseña</label>
+            <div class="auth-password-group">
+              <input id="loginPassword" type="password" placeholder="Tu contraseña" required />
+              <button type="button" class="password-toggle" aria-label="Mostrar u ocultar contraseña">Mostrar</button>
+            </div>
+
+            <div class="auth-remember">
+              <label><input id="rememberMe" type="checkbox" /> Recuérdame en este dispositivo</label>
+            </div>
+
+            <button type="submit" class="btn btn-primary auth-submit">Entrar</button>
+          </form>
+        </div>
+
+        <div class="auth-panel" id="registerPanel">
+          <h2>Crea tu cuenta</h2>
+          <p>Regístrate con usuario, correo y contraseña para empezar a crear videos.</p>
+
+          <form id="registerForm" class="auth-form">
+            <label for="registerUsername">Usuario</label>
+            <input id="registerUsername" type="text" placeholder="Elige tu usuario" required />
+
+            <label for="registerEmail">Correo</label>
+            <input id="registerEmail" type="email" placeholder="Tu correo" required />
+
+            <label for="registerPassword">Contraseña</label>
+            <div class="auth-password-group">
+              <input id="registerPassword" type="password" placeholder="Crea una contraseña" required />
+              <button type="button" class="password-toggle" aria-label="Mostrar u ocultar contraseña">Mostrar</button>
+            </div>
+
+            <button type="submit" class="btn btn-primary auth-submit">Registrarme</button>
+          </form>
+        </div>
+
+        <div id="authToast" class="auth-toast" aria-live="polite"></div>
+      </section>
+    </div>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>

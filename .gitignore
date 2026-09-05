@@ -1,0 +1,13 @@
+__pycache__/
+.env
+.venv/
+*.pyc
+buildozer.spec
+config.yml
+dashboard.html
+login.html
+README.md
+README_BUILD.md
+requirements.txt
+script.js
+style.css
