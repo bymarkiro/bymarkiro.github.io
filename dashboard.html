@@ -58,7 +58,7 @@
     .button-row { display:flex; gap:0.75rem; flex-wrap:wrap; margin-top:0.6rem; }
 
     .preview-panel .panel-card { min-height:420px; display:flex; flex-direction:column; gap:0.75rem; }
-    .preview-frame { flex:1; border-radius:12px; border:1px solid var(--line); background:linear-gradient(135deg, rgba(215,175,101,0.08), rgba(255,255,255,0.02)); display:flex; align-items:center; justify-content:center; }
+    .preview-frame { flex:1; border-radius:12px; border:1px solid var(--line); background:linear-gradient(135deg, rgba(215,175,101,0.08), rgba(255,255,255,0.02)); display:flex; align-items:center;[...]
     .studio-preview { width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; color:var(--muted); }
 
     .photo-stage { display:flex; align-items:center; gap:0.8rem; }
@@ -200,7 +200,7 @@
               <button class="btn quick-create-btn" data-kind="image">Miniatura</button>
               <button class="btn quick-create-btn" data-kind="photo-video">Foto → Video</button>
             </div>
-            <p style="margin-top:0.8rem;color:var(--muted)">Nota: Actualmente la generación es simulada en el cliente. Para integración real necesitas un backend que llame a un modelo de IA.</p>
+            <p style="margin-top:0.8rem;color:var(--muted)">Nota: Actualmente la generación es simulada en el cliente. Para integración real necesitas un backend que llame a un modelo de IA.</p[...]
           </div>
         </section>
       </main>
@@ -233,15 +233,7 @@
       generateVideo();
     });
 
-    // Download button: download preview as placeholder image
-    const downloadBtn = document.getElementById('downloadBtn');
-    if (downloadBtn) {
-      downloadBtn.addEventListener('click', () => {
-        const preview = document.getElementById('studioPreview');
-        if (!preview) return alert('No hay preview para descargar.');
-        alert('Descarga simulada: en producción descargarías el archivo generado desde el servidor.');
-      });
-    }
+    // Nota: El manejo del botón "Descargar" está implementado en script.js para descargar MP4 cuando esté disponible.
 
     // Ensure UI reflects plan/usage
     updateAuthUI();
