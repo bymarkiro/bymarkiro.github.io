@@ -3,11 +3,20 @@ const fs = require('fs');
 const path = require('path');
 const fetch = require('node-fetch');
 const cors = require('cors');
+const multer = require('multer');
+const FormData = require('form-data');
 require('dotenv').config();
 
 const app = express();
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cors());
+
+// Multer para subidas de archivos
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 }
+});
 
 const PORT = process.env.PORT || 3000;
 const REPLICATE_API_KEY = process.env.REPLICATE_API_KEY || '';
@@ -18,12 +27,23 @@ const PUBLIC_VIDEOS = path.join(__dirname, 'public', 'videos');
 fs.mkdirSync(PUBLIC_VIDEOS, { recursive: true });
 
 /**
- * Generate video using Replicate API (Runway or similar)
- * Supports text-to-video generation
+ * Generate video using Replicate API
+ * Supports text-to-video generation with optional image input
  */
-async function generateVideoWithReplicate(prompt, duration = 10) {
+async function generateVideoWithReplicate(prompt, duration = 10, imageBase64 = null) {
   if (!REPLICATE_API_KEY) {
     throw new Error('REPLICATE_API_KEY not configured');
+  }
+
+  const input = {
+    prompt: prompt,
+    num_inference_steps: 40,
+    guidance_scale: 7.5
+  };
+
+  // Si hay imagen, usarla como frame inicial
+  if (imageBase64) {
+    input.image = `data:image/jpeg;base64,${imageBase64}`;
   }
 
   // Create prediction on Replicate
@@ -34,12 +54,8 @@ async function generateVideoWithReplicate(prompt, duration = 10) {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      version: 'e04e9dce6330d59db81880486bafab8438c2e5b9d0fa2e9b57841e391287ff17', // Runway Gen3 Turbo
-      input: {
-        prompt: prompt,
-        num_frames: duration * 24, // 24fps
-        loop: false
-      }
+      version: '4d0d4c0f2891efb58f1201b374dd2150273c25579e65b428c14ca1ee84c09341', // Runway Gen3 Turbo
+      input: input
     })
   });
 
@@ -51,9 +67,11 @@ async function generateVideoWithReplicate(prompt, duration = 10) {
   const prediction = await createRes.json();
   let predId = prediction.id;
 
-  // Poll until done (max 5 minutes)
+  console.log(`[Replicate] Prediction ID: ${predId}`);
+
+  // Poll until done (max 10 minutes)
   let attempts = 0;
-  const maxAttempts = 60;
+  const maxAttempts = 120;
 
   while (attempts < maxAttempts) {
     const statusRes = await fetch(`https://api.replicate.com/v1/predictions/${predId}`, {
@@ -65,6 +83,7 @@ async function generateVideoWithReplicate(prompt, duration = 10) {
     }
 
     const status = await statusRes.json();
+    console.log(`[Replicate] Status: ${status.status}`);
 
     if (status.status === 'succeeded') {
       if (status.output && status.output.length > 0) {
@@ -74,15 +93,15 @@ async function generateVideoWithReplicate(prompt, duration = 10) {
     }
 
     if (status.status === 'failed') {
-      throw new Error(`Video generation failed: ${status.error}`);
+      throw new Error(`Video generation failed: ${status.error || 'Unknown error'}`);
     }
 
-    // Wait before polling again
+    // Wait before polling again (5 seconds)
     await new Promise(r => setTimeout(r, 5000));
     attempts++;
   }
 
-  throw new Error('Video generation timeout');
+  throw new Error('Video generation timeout (10+ minutes)');
 }
 
 /**
@@ -91,6 +110,8 @@ async function generateVideoWithReplicate(prompt, duration = 10) {
 async function downloadVideo(videoUrl) {
   const outName = `generated-${Date.now()}.mp4`;
   const outPath = path.join(PUBLIC_VIDEOS, outName);
+
+  console.log(`[Download] Downloading from: ${videoUrl.substring(0, 50)}...`);
 
   const resp = await fetch(videoUrl);
   if (!resp.ok) {
@@ -101,19 +122,22 @@ async function downloadVideo(videoUrl) {
     const dest = fs.createWriteStream(outPath);
     resp.body.pipe(dest);
     resp.body.on('error', reject);
-    dest.on('finish', () => resolve(outName));
+    dest.on('finish', () => {
+      console.log(`[Download] Saved to: ${outName}`);
+      resolve(outName);
+    });
     dest.on('error', reject);
   });
 }
 
 /**
  * POST /api/generate
- * Request: { prompt, duration }
- * Response: { ok: true, url: "..." } or { ok: false, error: "..." }
+ * Generate video from text prompt (with optional image)
+ * Request: { prompt, duration, image_base64 (optional) }
  */
 app.post('/api/generate', async (req, res) => {
   try {
-    const { prompt, duration = 10 } = req.body || {};
+    const { prompt, duration = 10, image_base64 = null } = req.body || {};
 
     if (!prompt) {
       return res.status(400).json({ ok: false, error: 'prompt_required' });
@@ -126,10 +150,14 @@ app.post('/api/generate', async (req, res) => {
       });
     }
 
-    console.log(`[Generate] Prompt: "${prompt.slice(0, 50)}..." Duration: ${duration}s`);
+    console.log(`[Generate] Prompt: "${prompt.slice(0, 50)}..." Duration: ${duration}s Image: ${image_base64 ? 'Yes' : 'No'}`);
 
     // Generate video on Replicate
-    const videoUrl = await generateVideoWithReplicate(prompt, Math.min(duration, 10));
+    const videoUrl = await generateVideoWithReplicate(
+      prompt, 
+      Math.min(duration, 10),
+      image_base64
+    );
 
     // Download to local storage
     const fileName = await downloadVideo(videoUrl);
@@ -149,8 +177,7 @@ app.post('/api/generate', async (req, res) => {
 
 /**
  * POST /api/generate-image
- * Request: { prompt }
- * Response: { ok: true, url: "..." } or { ok: false, error: "..." }
+ * Generate image from text prompt using FLUX
  */
 app.post('/api/generate-image', async (req, res) => {
   try {
@@ -177,11 +204,12 @@ app.post('/api/generate-image', async (req, res) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        version: '8926d02a3a8bbc86e7b8f5db3b5c0d6c4a3e7f8a9b0c1d2e3f4a5b6c7d8e9f0', // FLUX pro
+        version: 'e04e9dce6330d59db81880486bafab8438c2e5b9d0fa2e9b57841e391287ff17', // FLUX
         input: {
           prompt: prompt,
-          aspect_ratio: '16:9',
-          num_outputs: 1
+          guidance: 3,
+          num_outputs: 1,
+          aspect_ratio: '16:9'
         }
       })
     });
@@ -194,9 +222,11 @@ app.post('/api/generate-image', async (req, res) => {
     const prediction = await createRes.json();
     let predId = prediction.id;
 
+    console.log(`[Image] Prediction ID: ${predId}`);
+
     // Poll for result
     let attempts = 0;
-    while (attempts < 30) {
+    while (attempts < 60) {
       const statusRes = await fetch(`https://api.replicate.com/v1/predictions/${predId}`, {
         headers: { 'Authorization': `Token ${REPLICATE_API_KEY}` }
       });
@@ -204,6 +234,7 @@ app.post('/api/generate-image', async (req, res) => {
       const status = await statusRes.json();
 
       if (status.status === 'succeeded' && status.output && status.output.length > 0) {
+        console.log(`[Image] Generated successfully`);
         return res.json({ ok: true, url: status.output[0] });
       }
 
@@ -224,13 +255,12 @@ app.post('/api/generate-image', async (req, res) => {
 
 /**
  * POST /api/photo-to-video
- * Convert uploaded photo to video
+ * Convert uploaded photo to video with motion and animation
+ * Uses the photo as key frame and generates motion
  */
-app.post('/api/photo-to-video', async (req, res) => {
+app.post('/api/photo-to-video', upload.single('photo'), async (req, res) => {
   try {
-    const { allow_nsfw } = req.body || {};
-
-    if (!req.files || !req.files.photo) {
+    if (!req.file) {
       return res.status(400).json({ ok: false, error: 'photo_required' });
     }
 
@@ -238,14 +268,30 @@ app.post('/api/photo-to-video', async (req, res) => {
       return res.status(500).json({ ok: false, error: 'Server not configured' });
     }
 
-    console.log('[PhotoVideo] Converting uploaded photo...');
+    const { allow_nsfw = false, prompt = 'Smooth camera motion and subtle animation' } = req.body;
 
-    // For now, return a simple response
-    // In production, you'd upload the photo and use image-to-video model
+    console.log(`[PhotoVideo] Converting uploaded photo... Size: ${req.file.size} bytes`);
+
+    // Convert image buffer to base64
+    const imageBase64 = req.file.buffer.toString('base64');
+
+    // Generate video using the uploaded photo
+    const videoUrl = await generateVideoWithReplicate(
+      `Photo animation: ${prompt}. Use the provided image as the key frame.`,
+      10,
+      imageBase64
+    );
+
+    // Download to local storage
+    const fileName = await downloadVideo(videoUrl);
+
+    // Return serveable URL
+    const publicUrl = `${req.protocol}://${req.get('host')}/videos/${fileName}`;
+
     return res.json({
       ok: true,
-      url: `/videos/sample-${Date.now()}.mp4`,
-      message: 'Photo-to-video feature coming soon'
+      url: publicUrl,
+      message: 'Photo converted to video successfully'
     });
   } catch (err) {
     console.error('[PhotoVideo Error]', err);
@@ -258,12 +304,18 @@ app.use('/videos', express.static(path.join(__dirname, 'public', 'videos')));
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ ok: true, api_configured: !!REPLICATE_API_KEY });
+  res.json({ 
+    ok: true, 
+    api_configured: !!REPLICATE_API_KEY,
+    uptime: process.uptime()
+  });
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`\n${'='.repeat(60)}`);
+  console.log(`🚀 MotionFlow AI Server running on http://localhost:${PORT}`);
   console.log(`📹 Videos served from /videos`);
-  console.log(`✅ REPLICATE_API_KEY: ${REPLICATE_API_KEY ? 'configured' : 'MISSING'}`);
+  console.log(`✅ REPLICATE_API_KEY: ${REPLICATE_API_KEY ? '✓ configured' : '✗ MISSING'}`);
   console.log(`📱 CORS enabled`);
+  console.log(`${('=').repeat(60)}\n`);
 });
