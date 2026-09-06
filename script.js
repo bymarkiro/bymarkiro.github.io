@@ -1,3 +1,4 @@
+// Smooth scrolling for anchor links
 document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
   anchor.addEventListener('click', function (event) {
     event.preventDefault();
@@ -48,7 +49,6 @@ function saveCurrentUser(username, email, plan = 'free', password = '', remember
       sessionStorage.setItem(userKey, JSON.stringify(user));
     }
   } catch (e) {
-    // Fallback to localStorage if sessionStorage fails
     localStorage.setItem(userKey, JSON.stringify(user));
   }
   updateAuthUI();
@@ -83,7 +83,6 @@ function setPlan(plan) {
   const user = getCurrentUser();
   if (user) {
     const updatedUser = { ...user, plan };
-    // preserve where the user was stored
     try {
       if (localStorage.getItem(userKey)) {
         localStorage.setItem(userKey, JSON.stringify(updatedUser));
@@ -212,33 +211,58 @@ function renderPreview(kind, prompt, extraLabel = '') {
   `;
 }
 
-// Helper: update preview with a playable video URL and try to autoplay (muted) for immediate feedback
+// ✅ UPDATED: Better video preview with proper video element
 function updatePreviewWithVideo(videoUrl, labelText = 'Video generado') {
   const preview = document.getElementById('studioPreview');
   const previewLabel = document.getElementById('previewLabel');
+  
   if (previewLabel) previewLabel.textContent = labelText;
   if (!preview) return;
 
-  preview.innerHTML = `<video id="generatedVideo" controls src="${videoUrl}" style="max-width:100%;border-radius:8px"></video>`;
+  console.log('[Preview] Loading video from:', videoUrl);
+
+  // Create video element with proper styling
+  preview.innerHTML = `
+    <video 
+      id="generatedVideo" 
+      controls 
+      autoplay
+      muted
+      playsinline
+      style="width: 100%; height: 100%; border-radius: 8px; object-fit: contain; background: #000;">
+      <source src="${videoUrl}" type="video/mp4">
+      Tu navegador no soporta videos HTML5
+    </video>
+  `;
 
   const videoEl = document.getElementById('generatedVideo');
   if (videoEl) {
-    // Try to autoplay muted for instant feedback (many browsers allow muted autoplay)
+    // Try to autoplay (muted by default)
     videoEl.muted = true;
+    
     const playPromise = videoEl.play();
     if (playPromise && typeof playPromise.then === 'function') {
       playPromise.then(() => {
-        // Playback started; unmute so user can hear if they choose
-        // Keep it muted by default to avoid unexpected audio
-      }).catch(() => {
-        // Autoplay failed (browser policy); user can press play
+        console.log('[Preview] Video playing');
+      }).catch((err) => {
+        console.warn('[Preview] Autoplay failed (browser policy):', err);
       });
     }
 
-    // When metadata loaded, enable download button
+    // Enable download when metadata loads
     videoEl.addEventListener('loadedmetadata', () => {
+      console.log('[Preview] Video metadata loaded');
       const downloadBtn = document.getElementById('downloadBtn');
-      if (downloadBtn) downloadBtn.disabled = false;
+      if (downloadBtn) {
+        downloadBtn.disabled = false;
+        console.log('[Preview] Download button enabled');
+      }
+    });
+
+    // Log errors
+    videoEl.addEventListener('error', (e) => {
+      console.error('[Preview] Video error:', e);
+      showToast('Error al cargar el video', true);
     });
   }
 }
@@ -274,7 +298,7 @@ if (photoInput) {
   });
 }
 
-function generateVideo() {
+async function generateVideo() {
   const promptInput = document.getElementById('videoPrompt');
   const statusPill = document.getElementById('statusPill');
   const usageCounter = document.getElementById('usageCounter');
@@ -286,49 +310,53 @@ function generateVideo() {
   }
 
   if (statusPill) {
-    statusPill.textContent = 'Generando video...';
+    statusPill.textContent = 'Generando video con IA...';
   }
 
   const currentPrompt = promptInput ? promptInput.value.trim() : '';
   showToast(currentPrompt ? `Generando video para: ${currentPrompt.slice(0, 42)}...` : 'Generando video...');
 
-  setTimeout(() => {
+  try {
+    const durationInput = document.getElementById('videoDuration');
+    const duration = durationInput ? Number(durationInput.value) : 10;
+
+    const endpoint = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+      ? 'http://localhost:3000/api/generate'
+      : '/api/generate';
+
+    console.log('[Generate] Sending request to:', endpoint);
+
+    const resp = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: currentPrompt, duration })
+    });
+
+    console.log('[Generate] Response status:', resp.status);
+
+    const data = await resp.json();
+    
+    if (!data.ok) {
+      showToast('Error al generar: ' + (data.error || 'unknown'), true);
+      if (statusPill) statusPill.textContent = 'Error en generación';
+      return;
+    }
+
     const plan = getPlan();
     if (plan !== 'premium' && getCurrentUser()) {
       const nextUsage = getTodayUsage() + 1;
       setTodayUsage(nextUsage);
     }
 
-    renderPreview('video', currentPrompt || 'Anuncio premium con estilo cinematográfico');
+    lastGeneratedVideoUrl = data.url;
+    lastGeneratedVideoName = lastGeneratedVideoUrl.split('/').pop();
 
-    // --- Start: Simulated MP4 output so the Download button works locally ---
-    try {
-      // Revoke previous object URL if any
-      if (lastGeneratedVideoUrl && lastGeneratedVideoUrl.startsWith('blob:')) {
-        try { URL.revokeObjectURL(lastGeneratedVideoUrl); } catch (e) { /* ignore */ }
-      }
+    console.log('[Generate] Video URL:', lastGeneratedVideoUrl);
 
-      lastGeneratedVideoName = (currentPrompt ? currentPrompt.slice(0,40).replace(/\s+/g,'_') : 'video') + '.mp4';
-
-      // Create a small empty blob of type video/mp4 for simulation.
-      // In production replace this assignment with the real URL from your backend.
-      const dummyBlob = new Blob([''], { type: 'video/mp4' });
-      lastGeneratedVideoUrl = URL.createObjectURL(dummyBlob);
-
-      // Use helper to show video and enable download when metadata is ready
-      updatePreviewWithVideo(lastGeneratedVideoUrl, 'Video generado (simulado)');
-
-      // Ensure the object URL is revoked when the page unloads
-      window.addEventListener('beforeunload', () => {
-        try { if (lastGeneratedVideoUrl && lastGeneratedVideoUrl.startsWith('blob:')) URL.revokeObjectURL(lastGeneratedVideoUrl); } catch (e) {}
-      });
-    } catch (e) {
-      console.warn('No se pudo crear URL simulada para MP4', e);
-    }
-    // --- End: Simulated MP4 output ---
+    updatePreviewWithVideo(lastGeneratedVideoUrl, 'Video generado');
 
     if (statusPill) {
-      statusPill.textContent = 'Video listo';
+      statusPill.textContent = 'Video listo ✓';
     }
 
     if (usageCounter) {
@@ -338,44 +366,11 @@ function generateVideo() {
     showToast(plan === 'premium' || !getCurrentUser()
       ? 'Video generado. Puedes seguir creando desde esta vista.'
       : 'Video generado. Hoy ya usaste tu cuota gratuita.');
-  }, 1200);
-}
-
-const signupForm = document.getElementById('signupForm');
-if (signupForm) {
-  signupForm.addEventListener('submit', (event) => {
-    event.preventDefault();
-
-    const usernameInput = document.getElementById('usernameInput');
-    const emailInput = document.getElementById('emailInput');
-    const username = usernameInput ? usernameInput.value.trim() : '';
-    const email = emailInput ? emailInput.value.trim() : '';
-
-    if (!username || !email) {
-      showToast('Necesitas usuario y correo para registrarte.', true);
-      return;
-    }
-
-    if (!email.includes('@') || !email.includes('.')) {
-      showToast('Introduce un correo válido.', true);
-      return;
-    }
-
-    const accounts = getAccounts();
-    const exists = accounts.some((account) => {
-      return account.username.toLowerCase() === username.toLowerCase() || account.email.toLowerCase() === email.toLowerCase();
-    });
-
-    if (exists) {
-      showToast('Ese usuario o correo ya está registrado.', true);
-      return;
-    }
-
-    const user = syncUserToAccounts(username, email, 'free', '');
-    saveCurrentUser(user.username, user.email, user.plan, user.password || '', true);
-    showToast(`Registro completado. Bienvenido, ${username}.`);
-    signupForm.reset();
-  });
+  } catch (err) {
+    console.error('[Generate Error]', err);
+    showToast('Error durante la generación: ' + err.message, true);
+    if (statusPill) statusPill.textContent = 'Error';
+  }
 }
 
 const generateBtn = document.getElementById('generateBtn');
@@ -383,11 +378,12 @@ if (generateBtn) {
   generateBtn.addEventListener('click', generateVideo);
 }
 
-// Upload helper — sends photo to backend for photo→video conversion
+// Upload helper for photo-to-video
 async function uploadPhotoToServer(file, allowNSFW = false) {
   const form = new FormData();
   form.append('photo', file);
   form.append('allow_nsfw', allowNSFW ? '1' : '0');
+  form.append('prompt', 'Smooth animation and elegant motion');
 
   const endpoint = (window.location.hostname === 'localhost')
     ? 'http://localhost:3000/api/photo-to-video'
@@ -400,7 +396,7 @@ async function uploadPhotoToServer(file, allowNSFW = false) {
   return resp.json();
 }
 
-// Quick-create buttons (with support for server-side photo->video)
+// Quick-create buttons
 document.querySelectorAll('.quick-create-btn').forEach((button) => {
   button.addEventListener('click', async () => {
     const kind = button.dataset.kind || 'video';
@@ -421,16 +417,12 @@ document.querySelectorAll('.quick-create-btn').forEach((button) => {
 
       if (statusPill) statusPill.textContent = 'Subiendo foto...';
       try {
+        console.log('[PhotoVideo] Uploading photo...');
         const result = await uploadPhotoToServer(file, allowNSFW);
+        
         if (!result.ok) {
           const err = result.error || 'unknown';
-          if (err === 'content-flagged') {
-            showToast('La imagen fue marcada por la moderación. Marca permiso NSFW solo si realmente eres mayor y es tu imagen.', true);
-          } else if (err === 'blocked-minor-content') {
-            showToast('Imagen bloqueada por política (contenido de menores).', true);
-          } else {
-            showToast('Error al procesar la imagen.', true);
-          }
+          showToast('Error al procesar la imagen: ' + err, true);
           if (statusPill) statusPill.textContent = 'Error';
           return;
         }
@@ -439,21 +431,23 @@ document.querySelectorAll('.quick-create-btn').forEach((button) => {
         lastGeneratedVideoUrl = videoUrl;
         lastGeneratedVideoName = videoUrl.split('/').pop();
 
-        // Use helper to update preview and enable download
+        console.log('[PhotoVideo] Generated video URL:', videoUrl);
+
         updatePreviewWithVideo(videoUrl, 'Video desde foto');
 
         const downloadBtn = document.getElementById('downloadBtn');
         if (downloadBtn) downloadBtn.disabled = false;
-        if (statusPill) statusPill.textContent = 'Video desde foto listo';
+        if (statusPill) statusPill.textContent = 'Video desde foto listo ✓';
         showToast('Foto convertida en video. Puedes descargarla.');
       } catch (e) {
-        console.error(e);
-        showToast('Error al convertir la foto.', true);
+        console.error('[PhotoVideo Error]', e);
+        showToast('Error al convertir la foto: ' + e.message, true);
         if (statusPill) statusPill.textContent = 'Error';
       }
       return;
     }
 
+    // Regular video/image generation
     if (statusPill) {
       statusPill.textContent = kind === 'image' ? 'Generando imagen...' : 'Generando video...';
     }
@@ -501,128 +495,51 @@ document.querySelectorAll('.plan-btn').forEach((button) => {
   });
 });
 
-// Server-side generation with voice (called by generate button override)
-async function requestGenerateWithVoice(promptText, voice = 'alloy', duration = 8) {
-  try {
-    showToast('Generando audio y mezclando...');
-
-    const endpoint = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-      ? 'http://localhost:3000/api/generate'
-      : '/api/generate';
-
-    const resp = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: promptText, voice, duration })
-    });
-
-    const data = await resp.json();
-    if (!data.ok) {
-      showToast('Error al generar: ' + (data.error || 'unknown'), true);
-      return;
-    }
-
-    // Usa la URL devuelta
-    lastGeneratedVideoUrl = data.url;
-    lastGeneratedVideoName = lastGeneratedVideoUrl.split('/').pop();
-
-    // Use helper to update preview and enable download
-    updatePreviewWithVideo(lastGeneratedVideoUrl, 'Video generado');
-
-    showToast('Generación completada. Puedes reproducir o descargar.');
-  } catch (err) {
-    console.error(err);
-    showToast('Error durante la generación', true);
-  }
-}
-
-// Override generate button to call server-side generation with voice
-const originalGenerate = generateVideo;
-const genBtn = document.getElementById('generateBtn');
-if (genBtn) {
-  genBtn.removeEventListener('click', generateVideo);
-  genBtn.addEventListener('click', async () => {
-    const promptInput = document.getElementById('videoPrompt');
-    const durationInput = document.getElementById('videoDuration');
-    const prompt = promptInput ? promptInput.value.trim() : '';
-    const duration = durationInput ? Number(durationInput.value) : 8;
-
-    // If user uploaded a photo and chose photo-video, keep existing flow
-    const photoInputEl = document.getElementById('photoInput');
-    const file = photoInputEl && photoInputEl.files ? photoInputEl.files[0] : null;
-    if (file) {
-      // fallback to current quick-create handler path
-      originalGenerate();
-      return;
-    }
-
-    if (!prompt) {
-      showToast('Escribe una descripción/prompt antes de generar.', true);
-      return;
-    }
-
-    await requestGenerateWithVoice(prompt, 'alloy', duration);
-  });
-}
-
-// Download button behavior
+// Download button
 const downloadBtn = document.getElementById('downloadBtn');
 if (downloadBtn) {
   downloadBtn.disabled = true;
   downloadBtn.addEventListener('click', async () => {
-    if (!lastGeneratedVideoUrl) return alert('No hay video generado para descargar.');
+    if (!lastGeneratedVideoUrl) {
+      alert('No hay video generado para descargar.');
+      return;
+    }
+    
     const filename = lastGeneratedVideoName || lastGeneratedVideoUrl.split('/').pop();
 
-    // Try simple anchor download first
     try {
+      console.log('[Download] Downloading:', filename);
       const a = document.createElement('a');
       a.href = lastGeneratedVideoUrl;
       a.download = filename;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      return;
+      showToast('Descarga iniciada: ' + filename);
     } catch (e) {
-      console.warn('Anchor download failed, falling back to fetch+blob', e);
-    }
-
-    // Fallback: fetch blob and download
-    try {
-      const resp = await fetch(lastGeneratedVideoUrl);
-      if (!resp.ok) throw new Error('download failed');
-      const blob = await resp.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      alert('Error al descargar el archivo.');
-      console.error(err);
+      console.warn('[Download] Anchor download failed:', e);
+      try {
+        const resp = await fetch(lastGeneratedVideoUrl);
+        if (!resp.ok) throw new Error('download failed');
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        showToast('Descarga completada: ' + filename);
+      } catch (err) {
+        alert('Error al descargar el archivo: ' + err.message);
+        console.error('[Download Error]', err);
+      }
     }
   });
 }
 
-document.querySelectorAll('.plan-btn').forEach((button) => {
-  button.addEventListener('click', () => {
-    const user = getCurrentUser();
-    if (!user) {
-      showToast('Primero regístrate con usuario y correo.', true);
-      return;
-    }
-
-    const plan = button.dataset.plan;
-    setPlan(plan || 'free');
-    showToast(plan === 'premium'
-      ? 'Premium activado para generar videos ilimitados.'
-      : 'Has elegido el plan gratuito. Puedes generar 1 video al día.');
-  });
-});
-
-// Login form: ahora solo email + contraseña y soporte para "Recuérdame"
+// Login form
 const loginForm = document.getElementById('loginForm');
 if (loginForm) {
   loginForm.addEventListener('submit', (event) => {
@@ -645,7 +562,6 @@ if (loginForm) {
     }
 
     const accounts = getAccounts();
-    // Buscar por email y contraseña (no por usuario)
     const account = accounts.find((entry) => {
       return entry.email.toLowerCase() === email.toLowerCase()
         && entry.password === password;
@@ -659,18 +575,17 @@ if (loginForm) {
       return;
     }
 
-    // Guardar sesión según 'remember'
     saveCurrentUser(account.username || '', account.email, account.plan || 'free', account.password || '', remember);
     if (toast) {
       toast.textContent = `Hola, ${account.username || account.email}. Redirigiendo...`;
       toast.style.color = '#f1d8a2';
     }
 
-    // Redirección inmediata sin guardar entrada en el historial
     window.location.replace('dashboard.html');
   });
 }
 
+// Register form
 const registerForm = document.getElementById('registerForm');
 if (registerForm) {
   registerForm.addEventListener('submit', (event) => {
@@ -722,14 +637,12 @@ if (registerForm) {
     }
 
     const user = syncUserToAccounts(username, email, 'free', password);
-    // Por defecto al registrarse se recuerda la sesión (puedes cambiarlo si prefieres requerir login)
     saveCurrentUser(user.username, user.email, user.plan, user.password || '', true);
     if (toast) {
       toast.textContent = `Cuenta creada para ${username}. Redirigiendo...`;
       toast.style.color = '#f1d8a2';
     }
 
-    // Redirección inmediata sin guardar entrada en el historial
     window.location.replace('dashboard.html');
   });
 }
@@ -773,4 +686,5 @@ if (contactForm) {
   });
 }
 
+console.log('[Init] MotionFlow AI loaded');
 updateAuthUI();
