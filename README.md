@@ -1,4 +1,4 @@
-# th3dr4k3r.ia — Generador de Ideas de Video con IA
+# bymarkiro.ia — Generador de Ideas de Video con IA
 
 Una plataforma privada para crear contenido audiovisual completo: **guiones, prompts visuales, estilos y exportación a MP4**.
 
@@ -206,7 +206,7 @@ Este proyecto es de uso privado. © 2026 th3dr4k3r.ia
 
 ## 👤 Autor
 
-**starxven** — Desarrollo y diseño  
+**bymarkiro** — Desarrollo y diseño  
 GitHub: https://github.com/starxven
 
 ---
@@ -215,4 +215,4 @@ GitHub: https://github.com/starxven
 
 Para reportar bugs o sugerencias, abre un issue en el repositorio.
 
-**¡Gracias por usar th3dr4k3r.ia!** 🚀✨
+**¡Gracias por usar bymarkiro.ia!** 🚀✨
